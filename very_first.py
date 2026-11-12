@@ -1,6 +1,6 @@
 # python -m uvicorn very_first:app --reload
 
-from fastapi import FastAPI, Request, Form, HTTPException, status
+from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse , RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -9,6 +9,7 @@ import csv
 import hashlib
 import templates
 import os
+from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 
 
 app = FastAPI()
@@ -37,8 +38,10 @@ async def check_session_middleware(request: Request, call_next):
 app.add_middleware(
     SessionMiddleware,
     secret_key=os.getenv("SECRET_KEY", "legenda67prosuper"),
-    max_age= 10 # Сессия будет жить 90(в секундах)
+    max_age = 60 # Сессия будет жить 90(в секундах)
 )
+
+app.add_middleware(HTTPSRedirectMiddleware)
 
 # Маршрутизация приложения
 @app.get("/", response_class=HTMLResponse) # перехват адреса http://localhost:8000/
@@ -73,6 +76,11 @@ def login_page(request: Request):
     return templates.TemplateResponse(request=request, name="404.html")
 
 
+@app.get("/403", response_class=HTMLResponse)
+def login_page(request: Request):
+    return templates.TemplateResponse(request=request, name="403.html")
+
+
 
 @app.post("/login")
 def login(request: Request, 
@@ -104,13 +112,15 @@ def log(request: Request,
         username : str = Form(...),
         password : str = Form(...),
         admin_login : str = Form(...),
-        admin_password: str = Form(...)
+        admin_password: str = Form(...),
+        avatar: UploadFile = File(None)
         ): 
     print(request)
     print(username)
     print(password)
     print(admin_login)
     print(admin_password)
+    print(avatar)
 
     if admin_login != "admin" or admin_password != "1234":
         return templates.TemplateResponse(request=request, name = "register.html", context={"error" : "Неверный админ логин и админ пароль"})
@@ -151,4 +161,5 @@ def whoami(request: Request):
         "session_data": dict(request.session),
         "is_authenticated": "username" in request.session
     }
+
 
