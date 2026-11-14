@@ -4,6 +4,37 @@
     <meta charset="UTF-8">
     <title>Главная</title>
     <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .status-badge {
+            display: inline-block;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 700;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            vertical-align: middle;
+            margin-left: 8px;
+        }
+        .status-owner {
+            background-color: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.2);
+        }
+        .status-moderator {
+            background-color: rgba(168, 85, 247, 0.15);
+            color: #a855f7;
+            border: 1px solid rgba(168, 85, 247, 0.4);
+            box-shadow: 0 0 10px rgba(168, 85, 247, 0.2);
+        }
+        .status-user {
+            background-color: rgba(34, 197, 94, 0.15);
+            color: #22c55e;
+            border: 1px solid rgba(34, 197, 94, 0.4);
+            box-shadow: 0 0 10px rgba(34, 197, 94, 0.2);
+        }
+    </style>
 </head>
 <body>
 <div class="container">
@@ -14,7 +45,16 @@
     <p>Аватарка не установлена</p>
     {% endif %}
     <p><b>Хэшированный пароль:</b> {{ password_hash }}</p>
-    <h2>Ваш статус: {{ status }}</h2>
+    
+    <h2>Ваш статус: 
+        <span class="status-badge 
+            {% if status == 'OWNER' %}status-owner
+            {% elif status == 'MODERATOR' %}status-moderator
+            {% else %}status-user{% endif %}">
+            {{ status }}
+        </span>
+    </h2>
+    
     <button onclick="toggleTheme()">Сменить тему</button>
 </div> 
 <script>

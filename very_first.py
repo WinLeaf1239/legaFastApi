@@ -115,7 +115,19 @@ def login(request: Request,
                 request.session['username'] = username  
                 request.session['password_hash'] = hash_password
                 request.session['avatar_url'] = row.get('avatar_path', '')  # <-- Берем путь из CSV и кладем в сессию
+
+                if username == "admin" and password == '1234':
+                    status = 'OWNER'
+                elif username == "moderator" and password == "qwerty":
+                    status = 'MODERATOR'
+                else:
+                    status = "USER"
+
+                request.session["status"] = status
+                
                 return RedirectResponse(url="/home", status_code=303)
+
+
 
 
             
@@ -151,29 +163,27 @@ def log(request: Request,
                     context={"error": "Пользователь с таким именем уже существует"}
                 )
 
+
+            
+
     avatar_url = ""
 
-    if avatar and avatar.filename:#Что делает: Проверяет два факта: существует ли сам объект avatar и не пустое ли у него имя файла (filename).
+    if avatar and avatar.filename:
 
-        image = Image.open(avatar.file)#Что делает: Берет загруженные байты из временного хранилища FastAPI (avatar.file) и открывает их как изображение с помощью библиотеки Pillow (Image).
+        image = Image.open(avatar.file)
 
-        image.thumbnail((300, 300)) # Что делает: Уменьшает размер картинки так, чтобы ни ширина, ни высота не превышали 300 пикселей.
+        image.thumbnail((300, 300)) 
 
-        file_location = f"static/images52/{username}.webp"#Что делает: Формирует текстовый путь на диске вашего компьютера, куда нужно положить готовый файл (например, static/images52/ivan.webp).
-        #Зачем нужно: Мы переименовываем файл в логин пользователя, чтобы два разных человека, загрузивших файлы с одинаковым названием avatar.png, не перезаписали картинки друг друга. Расширение .webp выбрано потому, что этот современный формат сжимает картинки в 2–3 раза сильнее старых .jpg и .png без потери качества.
+        file_location = f"static/images52/{username}.webp"
 
-        image.save(file_location, format="WEBP", quality=85)#Что делает: Физически записывает обработанную и сжатую картинку из оперативной памяти на жесткий диск по указанному выше пути.
-        #Зачем нужно: Параметр format="WEBP" принудительно переводит любую картинку (будь то PNG, JPEG или BMP) в единый формат WebP. Параметр quality=85 задает качество сжатия: визуально картинка остается идеальной, а весит считанные килобайты.
+        image.save(file_location, format="WEBP", quality=85)
 
-        avatar_url = f"/{file_location}"#Что делает: Добавляет прямой слэш / в начало пути, превращая static/images52/ivan.webp в /static/images52/ivan.webp.
-        #1. Зачем нужно: Это критически важная разница между путем на диске и веб-ссылкой. Для Python на компьютере путь начинается без слэша (относительно папки с проектом). Но когда браузер будет рисовать картинку в HTML-теге <img src="...">, слэш в начале говорит ему искать файл от самого корня сайта (https://localhost:8000/static/...), а не относительно текущей страницы.
+        avatar_url = f"/{file_location}"
+
 
     hash_password = hashlib.sha256(password.encode("utf-8")).hexdigest()
 
-    with open(file="users.csv", mode="a", newline="", encoding="utf-8") as file:
-        writer = csv.writer(file)
-        # Передаем пустую строку '' для колонки avatar_path, чтобы сохранить структуру CSV
-        writer.writerow([username, hash_password, avatar_url])
+
 
     request.session["username"] = username
     request.session["password_hash"] = hash_password
@@ -187,6 +197,13 @@ def log(request: Request,
         status = "USER"
 
     request.session["status"] = status
+
+
+
+    with open(file="users.csv", mode="a", newline="", encoding="utf-8") as file:
+        writer = csv.writer(file)
+        # Передаем пустую строку '' для колонки avatar_path, чтобы сохранить структуру CSV
+        writer.writerow([username, hash_password, avatar_url, status])
     
 
     return RedirectResponse(url="/home", status_code=303)
