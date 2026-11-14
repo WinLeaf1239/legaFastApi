@@ -1,5 +1,10 @@
 # python -m uvicorn very_first:app --reload
 
+#python -m uvicorn very_first:app --host 127.0.0.1 --port 8000 --ssl-keyfile=key.pem --ssl-certfile=cert.pem - на открытие через https
+
+#python -c "import datetime; from cryptography import x509; from cryptography.x509.oid import NameOID; from cryptography.hazmat.primitives import hashes, serialization; from cryptography.hazmat.primitives.asymmetric import rsa; key = rsa.generate_private_key(65537, 2048); name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'localhost')]); cert = x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(key.public_key()).serial_number(x509.random_serial_number()).not_valid_before(datetime.datetime.now(datetime.timezone.utc)).not_valid_after(datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=365)).sign(key, hashes.SHA256()); open('key.pem', 'wb').write(key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.TraditionalOpenSSL, serialization.NoEncryption())); open('cert.pem', 'wb').write(cert.public_bytes(serialization.Encoding.PEM))"
+#А ЭТО НА СОЗДАНИЕ КЛЧЮЧЕЙ И СЕРТЕФИКАТОВ ДЛЯ HTTPS
+
 from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse , RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -10,7 +15,10 @@ import hashlib
 import templates
 import os
 from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
+from PIL import Image
 
+#сразу создаем папку внутри статика
+os.makedirs("static/images52", exist_ok=True)
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -38,10 +46,10 @@ async def check_session_middleware(request: Request, call_next):
 app.add_middleware(
     SessionMiddleware,
     secret_key=os.getenv("SECRET_KEY", "legenda67prosuper"),
-    max_age = 60 # Сессия будет жить 90(в секундах)
+    max_age = 60, # Сессия будет жить 60(в секундах)
+    https_only=True
 )
 
-app.add_middleware(HTTPSRedirectMiddleware)
 
 # Маршрутизация приложения
 @app.get("/", response_class=HTMLResponse) # перехват адреса http://localhost:8000/
@@ -52,6 +60,8 @@ def main_page(request: Request):
 def home_page(request: Request):
     username = request.session.get("username")
     password_hash = request.session.get("password_hash")
+    avatar_url = request.session.get("avatar_url", "")
+    status = request.session.get("status")
 
     #Защита страницы: если в сессии нет имени пользователя, отправляем на вход
     if not username:
@@ -60,7 +70,10 @@ def home_page(request: Request):
     return templates.TemplateResponse(
         request=request,
         name="home.html",
-        context={"username": username, "password_hash": password_hash})
+        context={"username": username,
+                "password_hash": password_hash,
+                "avatar_url": avatar_url,
+                "status": status})
 
 
 @app.get("/login", response_class=HTMLResponse)
@@ -101,7 +114,10 @@ def login(request: Request,
                 print('Есть попадание')
                 request.session['username'] = username  
                 request.session['password_hash'] = hash_password
+                request.session['avatar_url'] = row.get('avatar_path', '')  # <-- Берем путь из CSV и кладем в сессию
                 return RedirectResponse(url="/home", status_code=303)
+
+
             
     print('Нету попадания') 
     return templates.TemplateResponse(request=request, name='login.html', context={'error': 'Неверное имя пользователя или пароль'})
@@ -114,7 +130,7 @@ def log(request: Request,
         admin_login : str = Form(...),
         admin_password: str = Form(...),
         avatar: UploadFile = File(None)
-        ): 
+        ):
     print(request)
     print(username)
     print(password)
@@ -135,15 +151,43 @@ def log(request: Request,
                     context={"error": "Пользователь с таким именем уже существует"}
                 )
 
+    avatar_url = ""
+
+    if avatar and avatar.filename:#Что делает: Проверяет два факта: существует ли сам объект avatar и не пустое ли у него имя файла (filename).
+
+        image = Image.open(avatar.file)#Что делает: Берет загруженные байты из временного хранилища FastAPI (avatar.file) и открывает их как изображение с помощью библиотеки Pillow (Image).
+
+        image.thumbnail((300, 300)) # Что делает: Уменьшает размер картинки так, чтобы ни ширина, ни высота не превышали 300 пикселей.
+
+        file_location = f"static/images52/{username}.webp"#Что делает: Формирует текстовый путь на диске вашего компьютера, куда нужно положить готовый файл (например, static/images52/ivan.webp).
+        #Зачем нужно: Мы переименовываем файл в логин пользователя, чтобы два разных человека, загрузивших файлы с одинаковым названием avatar.png, не перезаписали картинки друг друга. Расширение .webp выбрано потому, что этот современный формат сжимает картинки в 2–3 раза сильнее старых .jpg и .png без потери качества.
+
+        image.save(file_location, format="WEBP", quality=85)#Что делает: Физически записывает обработанную и сжатую картинку из оперативной памяти на жесткий диск по указанному выше пути.
+        #Зачем нужно: Параметр format="WEBP" принудительно переводит любую картинку (будь то PNG, JPEG или BMP) в единый формат WebP. Параметр quality=85 задает качество сжатия: визуально картинка остается идеальной, а весит считанные килобайты.
+
+        avatar_url = f"/{file_location}"#Что делает: Добавляет прямой слэш / в начало пути, превращая static/images52/ivan.webp в /static/images52/ivan.webp.
+        #1. Зачем нужно: Это критически важная разница между путем на диске и веб-ссылкой. Для Python на компьютере путь начинается без слэша (относительно папки с проектом). Но когда браузер будет рисовать картинку в HTML-теге <img src="...">, слэш в начале говорит ему искать файл от самого корня сайта (https://localhost:8000/static/...), а не относительно текущей страницы.
+
     hash_password = hashlib.sha256(password.encode("utf-8")).hexdigest()
 
     with open(file="users.csv", mode="a", newline="", encoding="utf-8") as file:
         writer = csv.writer(file)
         # Передаем пустую строку '' для колонки avatar_path, чтобы сохранить структуру CSV
-        writer.writerow([username, hash_password, ""])
+        writer.writerow([username, hash_password, avatar_url])
 
     request.session["username"] = username
     request.session["password_hash"] = hash_password
+    request.session["avatar_url"] = avatar_url
+
+    if username == "admin" and password == '1234':
+        status = 'OWNER'
+    elif username == "moderator" and password == "qwerty":
+        status = 'MODERATOR'
+    else:
+        status = "USER"
+
+    request.session["status"] = status
+    
 
     return RedirectResponse(url="/home", status_code=303)
 

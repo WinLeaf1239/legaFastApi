@@ -8,7 +8,13 @@
 <body>
 <div class="container">
     <h2>Добро пожаловать, {{ username }}!</h2>
+    {% if avatar_url %}
+    <img src="{{ avatar_url }}" alt="Аватар" style="width: 150px; height: 150px; border-radius: 50%; object-fit: cover;">
+    {% else %}
+    <p>Аватарка не установлена</p>
+    {% endif %}
     <p><b>Хэшированный пароль:</b> {{ password_hash }}</p>
+    <h2>Ваш статус: {{ status }}</h2>
     <button onclick="toggleTheme()">Сменить тему</button>
 </div> 
 <script>
